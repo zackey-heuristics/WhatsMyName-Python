@@ -16,7 +16,7 @@
 
 import argparse
 import contextlib
-import dis
+import datetime
 import json
 import pathlib
 import sys
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     with contextlib.ExitStack() as stack:
         if output not in (sys.stdout, sys.stderr):
             stack.callback(output.close)
-    
-        if not is_quiet:
+
+        if not json_output_enabled or not is_quiet:
             banner()
         headers = {
             "Accept": "text/html, application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -304,9 +304,12 @@ if __name__ == "__main__":
             if found_sites:
                 if json_output_enabled:
                     # Tuple to dictionary conversion
-                    found_site_dict = {}
+                    found_site_dict = {
+                        "results": {},
+                        "created_at_rfc3339": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    }
                     for site_name, uri_check in found_sites:
-                        found_site_dict[site_name] = uri_check
+                        found_site_dict["results"][site_name] = uri_check
                     json.dump(found_site_dict, output, indent=4)
                     if not is_quiet:
                         print(f"\nJSON output generated: {output.name}")
