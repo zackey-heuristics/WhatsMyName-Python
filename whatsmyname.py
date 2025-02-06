@@ -4,14 +4,28 @@
 # Usage           : 1.Scan for Username | 2.Current supported sites list | 3.Total number of sites | 4. Single Search
 # Version         : Version 1.1
 # Support         : Please do not support me, Support this project --> https://github.com/WebBreacher/WhatsMyName
+#
+# ----------------------------------------------------------------------
+# Modified by     : zackey-heuristics https://github.com/zackey-heuristics
+# Modification on : 2025-02-06
+# Changes         : 
+# 1. Added quiet mode for logging: implemented a mode that outputs only essential logs.
+# 2. Added option for JSON output: introduced an option to output results in JSON format.
+# 3. Added output destination option: implemented an option to specify the output destination.
+# ----------------------------------------------------------------------
 
+import argparse
+import contextlib
+import dis
+import json
+import pathlib
 import sys
 import time
-import argparse
-import json
+
 import requests
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
+
 
 # script banner
 def banner():
@@ -100,19 +114,25 @@ def generate_html_report(username, found_sites):
     with open(f"whatsmyname_report_{username}.html", "w") as report_file:
         report_file.write(html_content)
 
+
+def output_destination(value):
+    """
+    If the user passes 'stdout' or 'stderr', return the corresponding stream.
+    Otherwise, treat the value as a filename and attempt to open it for writing.
+    """
+    if value.lower() == 'stdout':
+        return sys.stdout
+    elif value.lower() == 'stderr':
+        return sys.stderr
+    else:
+        try:
+            # Open the file for writing.
+            return open(value, 'w')
+        except Exception as e:
+            raise argparse.ArgumentTypeError(f"Cannot open file '{value}' for writing: {e}")
+
 # main
 if __name__ == "__main__":
-    banner()
-    headers = {
-        "Accept": "text/html, application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "accept-language": "en-US;q=0.9,en,q=0,8",
-        "accept-encoding": "gzip, deflate",
-        "user-Agent": "Mozilla/5.0 (Windows NT 10.0;Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
-    }
-    # Fetch wmn-data from WhatsMyName repository
-    response = requests.get("https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json")
-    data = response.json()
-
     # Argparse arguments
     parser = argparse.ArgumentParser(
         description="Scan all sites on Project WhatsMyName for a target username "
@@ -143,87 +163,162 @@ if __name__ == "__main__":
         action="store_true",
         help="\033[32m\033[1m\nNumber of sites currently supported on Project WhatsMyName\033[0m\n",
     )
-
+    
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="\033[32m\033[1m\nQuiet mode: output only essential logs\033[0m\n",
+    )
+    
+    parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="\033[32m\033[1m\nOutput results in JSON format\033[0m\n",
+    )
+    
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=output_destination,
+        default=sys.stdout,
+        help="\033[32m\033[1m\nOutput result destination: specify a filename, 'stdout' for standard output, or 'stderr' for standard error.\033[0m\n",
+    )
+    
     # args settings
     args = parser.parse_args()
-
+    
     username = args.username
     singlesearch = args.singlesearch
     countsites = args.countsites
     fulllist = args.fulllist
-
-    found_sites = []
-
-    # Get full list of sites supported on Project WhatsMyName
-    if fulllist:
-        for i in tqdm(range(10)):
-            time.sleep(0.06)
-        for site in data["sites"]:
-            site_name = site["name"]
-            print(
-                f"""
-    ╔════════════════╦══════════════════════════════════╗
-    ║ WEBSITE NAME:  ║ ✅   \033[1m{site_name}                       
-    ╚════════════════╩══════════════════════════════════╝"""
-            )
-
-    # Get exact number of sites supported on Project WhatsMyName
-    if countsites:
-        for i in tqdm(range(10)):
-            time.sleep(0.1)
-        search_word = "uri_check"
-        total = sum(1 for site in data["sites"] if search_word in site)
-        print(
-            "\033[32m\033[1mTotal Number\033[0m\033[32m of sites currently supported on \033[1mProject WhatsMyName --> ",
-            total,
-        )
-
-    # Scan all websites for the username 
-    if username:
-        sites = data["sites"]
-
-        total_sites = len(sites)
-        found_sites = []
+    is_quiet = args.quiet
+    json_output_enabled = args.json
+    output = args.output
+    
+    with contextlib.ExitStack() as stack:
+        if output not in (sys.stdout, sys.stderr):
+            stack.callback(output.close)
+    
+        if not is_quiet:
+            banner()
+        headers = {
+            "Accept": "text/html, application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "accept-language": "en-US;q=0.9,en,q=0,8",
+            "accept-encoding": "gzip, deflate",
+            "user-Agent": "Mozilla/5.0 (Windows NT 10.0;Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+        }
+        try:
+            # Fetch wmn-data from WhatsMyName repository
+            response = requests.get("https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json")
+            # Raise an exception if the response status code is not 200
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTPError - Failed to fetch data from WhatsMyName repository: {e}", file=sys.stderr)
+            sys.exit(1)
+        except requests.exceptions.Timeout as e:
+            print(f"TimeoutError - Failed to fetch data from WhatsMyName repository: {e}", file=sys.stderr)
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f"RequestException - Failed to fetch data from WhatsMyName repository: {e}", file=sys.stderr)
+            sys.exit(1)
 
         try:
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                futures = {executor.submit(check_site, site, username, headers): site for site in sites}
+            data = response.json()
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode JSON data: {e}", file=sys.stderr)
+            sys.exit(1)
+        except ValueError as e:
+            print(f"Failed to parse JSON data: {e}", file=sys.stderr)
+            sys.exit(1)
 
-                with tqdm(total=total_sites, desc="Checking sites") as pbar:
-                    completed = 0
-                    for future in as_completed(futures):
-                        try:
-                            result = future.result()
-                            if result:
-                                site_name, uri_check = result
-                                found_sites.append((site_name, uri_check))
-                                print("\033[32m" + "-" * 133)
-                                print(f"\033[32m[+] \033[1mTarget found\033[0m\033[32m ✓ on: \033[1m{site_name}\033[0m")
-                                print(f"\033[32m[+] Profile URL: {uri_check}\033[0m")
-                                print("\033[32m" + "-" * 133)
-                        except:
-                            pass
-                        finally:
-                            completed += 1
-                            pbar.n = completed
-                            pbar.refresh()
+        found_sites = []
 
-        except TimeoutError:
-            print("Some sites took too long to respond and were skipped.")
+        
+        # Get full list of sites supported on Project WhatsMyName
+        if fulllist:
+            for i in tqdm(range(10)):
+                time.sleep(0.06)
+            for site in data["sites"]:
+                site_name = site["name"]
+                print(
+                    f"""
+        ╔════════════════╦══════════════════════════════════╗
+        ║ WEBSITE NAME:  ║ ✅   \033[1m{site_name}                       
+        ╚════════════════╩══════════════════════════════════╝"""
+                )
 
-        # Ensure the progress bar reaches 100%
-        pbar.n = total_sites
-        pbar.refresh()
+        # Get exact number of sites supported on Project WhatsMyName
+        if countsites:
+            for i in tqdm(range(10)):
+                time.sleep(0.1)
+            search_word = "uri_check"
+            total = sum(1 for site in data["sites"] if search_word in site)
+            print(
+                "\033[32m\033[1mTotal Number\033[0m\033[32m of sites currently supported on \033[1mProject WhatsMyName --> ",
+                total,
+            )
 
-        print("\nChecked all sites.")
-        if found_sites:
-            print(f"\nThe user \033[1m{username}\033[0m was found on {len(found_sites)} sites:")
-            for site_name, uri_check in found_sites:
-                print(f"- \033[32m{site_name}\033[0m: {uri_check}")
+        # Scan all websites for the username 
+        if username:
+            sites = data["sites"]
 
-            # Generate HTML report
-            generate_html_report(username, found_sites)
-            print(f"\nHTML report generated: whatsmyname_report_{username}.html")
-        else:
-            print(f"\nNo sites found for the user \033[1m{username}\033[0m.")
+            total_sites = len(sites)
+            found_sites = []
+
+            try:
+                with ThreadPoolExecutor(max_workers=20) as executor:
+                    futures = {executor.submit(check_site, site, username, headers): site for site in sites}
+
+                    with tqdm(total=total_sites, desc="Checking sites", disable=is_quiet) as pbar:
+                        completed = 0
+                        for future in as_completed(futures):
+                            try:
+                                result = future.result()
+                                if result:
+                                    site_name, uri_check = result
+                                    found_sites.append((site_name, uri_check))
+                                    if not is_quiet:
+                                        print("\033[32m" + "-" * 133)
+                                        print(f"\033[32m[+] \033[1mTarget found\033[0m\033[32m ✓ on: \033[1m{site_name}\033[0m")
+                                        print(f"\033[32m[+] Profile URL: {uri_check}\033[0m")
+                                        print("\033[32m" + "-" * 133)
+                            except:
+                                pass
+                            finally:
+                                completed += 1
+                                pbar.n = completed
+                                pbar.refresh()
+
+            except TimeoutError:
+                print("Some sites took too long to respond and were skipped.", file=sys.stderr)
+
+            # Ensure the progress bar reaches 100%
+            pbar.n = total_sites
+            pbar.refresh()
+
+            if not is_quiet:
+                print("\nChecked all sites.")
+                
+            if found_sites:
+                if json_output_enabled:
+                    # Tuple to dictionary conversion
+                    found_site_dict = {}
+                    for site_name, uri_check in found_sites:
+                        found_site_dict[site_name] = uri_check
+                    json.dump(found_site_dict, output, indent=4)
+                    if not is_quiet:
+                        print(f"\nJSON output generated: {output.name}")
+                else:            
+                    print(f"\nThe user \033[1m{username}\033[0m was found on {len(found_sites)} sites:", file=output)
+                    for site_name, uri_check in found_sites:
+                        print(f"- \033[32m{site_name}\033[0m: {uri_check}", file=output)
+
+                    # Generate HTML report
+                    generate_html_report(username, found_sites)
+                    if not is_quiet:
+                        print(f"\nHTML report generated: whatsmyname_report_{username}.html")
+            else:
+                print(f"\nNo sites found for the user \033[1m{username}\033[0m.")
 
