@@ -305,7 +305,9 @@ if __name__ == "__main__":
                     # Tuple to dictionary conversion
                     found_site_dict = {
                         "results": {},
-                        "created_at_rfc3339": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "metadata": {
+                            "created_at_rfc3339": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        }
                     }
                     for site_name, uri_check in found_sites:
                         found_site_dict["results"][site_name] = uri_check
