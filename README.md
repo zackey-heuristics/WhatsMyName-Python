@@ -75,6 +75,30 @@ python3 whatsmyname.py -u anonymouse
 python3 whatsmyname.py -u secretmonkey -s ebay
 ```
 
+- **Display in JSON format**:
+
+```
+python3 whatsmyname.py -u anonymouse -j
+```
+
+- **Output as JSON file**:
+
+```
+python3 whatsmyname.py -u anonymouse -j -o anonymouse.json
+```
+
+- **Quiet mode** that outputs only essential logs:
+
+```
+python3 whatsmyname.py -u anonymouse -q
+```
+
+- **Quiet mode and output as JSON file**
+
+```
+python3 whatsmyname.py -u anonymouse -q -j -o anonymouse.json
+```
+
 # Screenshot 📸
 
 <p align="center">
