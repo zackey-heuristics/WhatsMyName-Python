@@ -22,7 +22,7 @@ I am a regular contributor to the Project WhatsMyName, but I am not officially p
 # Installation ⚙️
 
 ```
-git clone https://github.com/C3n7ral051nt4g3ncy/WhatsMyName-Python
+git clone https://github.com/zackey-heuristics/WhatsMyName-Python
 ```
 
 ```
