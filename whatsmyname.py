@@ -18,7 +18,6 @@ import argparse
 import contextlib
 import datetime
 import json
-import pathlib
 import sys
 import time
 
