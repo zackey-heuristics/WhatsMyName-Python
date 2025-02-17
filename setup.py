@@ -16,7 +16,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "whatmyname=whatsmyname.whatsmyname:main",
+            "whatsmyname=whatsmyname.whatsmyname:main",
         ],
     },
     author="zackey-heuristics",
