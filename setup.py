@@ -21,8 +21,6 @@ setup(
     },
     author="zackey-heuristics",
     description="whatsmyname-python",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
     url="https://github.com/zackey-heuristics/WhatsMyName-Python"
 )
     
