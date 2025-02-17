@@ -131,7 +131,7 @@ def output_destination(value):
             raise argparse.ArgumentTypeError(f"Cannot open file '{value}' for writing: {e}")
 
 # main
-if __name__ == "__main__":
+def main():
     # Argparse arguments
     parser = argparse.ArgumentParser(
         description="Scan all sites on Project WhatsMyName for a target username "
@@ -326,3 +326,6 @@ if __name__ == "__main__":
             else:
                 print(f"\nNo sites found for the user \033[1m{username}\033[0m.")
 
+
+if __name__ == "__main__":
+    main()

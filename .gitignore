@@ -1,3 +1,5 @@
 whatsmyname_report_*.html
 .DS_Store
 .venv
+*.egg-info
+*.pyc
