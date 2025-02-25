@@ -57,13 +57,14 @@ def banner():
 def check_site(site, username, headers):
     site_name = site["name"]
     uri_check = site["uri_check"].format(account=username)
+    uri_pretty = site["uri_pretty"].format(account=username) if "uri_pretty" in site else uri_check
     try:
         res = requests.get(uri_check, headers=headers, timeout=10)
         estring_pos = site["e_string"] in res.text
         estring_neg = site["m_string"] in res.text
 
         if res.status_code == site["e_code"] and estring_pos and not estring_neg:
-            return site_name, uri_check
+            return site_name, uri_check, uri_pretty
     except:
         pass
     return None
@@ -99,11 +100,12 @@ def generate_html_report(username, found_sites):
                 <th>Website Name</th>
                 <th>Profile URL</th>
             </tr>"""
-    for site_name, uri_check in found_sites:
+    for site_name, uri_check, uri_pretty in found_sites:
         html_content += f"""
             <tr>
                 <td>{site_name}</td>
                 <td><a href="{uri_check}" target="_blank">{uri_check}</a></td>
+                <td><a href="{uri_pretty}" target="_blank">{uri_pretty}</a></td>
             </tr>"""
     html_content += """
         </table>
@@ -135,7 +137,8 @@ def main():
     # Argparse arguments
     parser = argparse.ArgumentParser(
         description="Scan all sites on Project WhatsMyName for a target username "
-                    "and wait for\033[32m\033[1m positive\033[0m identification."
+                    "and wait for\033[32m\033[1m positive\033[0m identification.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
     parser.add_argument(
@@ -185,6 +188,22 @@ def main():
         help="\033[32m\033[1m\nOutput result destination: specify a filename, 'stdout' for standard output, or 'stderr' for standard error.\033[0m\n",
     )
     
+    parser.add_argument(
+        "-ua",
+        "--useragent",
+        type=str,
+        default="Mozilla/5.0 (Windows NT 10.0;Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+        help="\033[32m\033[1m\nUser-Agent string to use for requests\033[0m\n",
+    )
+    
+    parser.add_argument(
+        "-du",
+        "--wmndata_url",
+        type=str,
+        default="https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json",
+        help="\033[32m\033[1m\nWhatsMyName data URL\033[0m\n",
+    )
+    
     # args settings
     args = parser.parse_args()
     
@@ -195,6 +214,8 @@ def main():
     is_quiet = args.quiet
     json_output_enabled = args.json
     output = args.output
+    useragent = args.useragent
+    wmn_data_url = args.wmndata_url
     
     with contextlib.ExitStack() as stack:
         if output not in (sys.stdout, sys.stderr):
@@ -206,11 +227,11 @@ def main():
             "Accept": "text/html, application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "en-US;q=0.9,en,q=0,8",
             "accept-encoding": "gzip, deflate",
-            "user-Agent": "Mozilla/5.0 (Windows NT 10.0;Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+            "user-Agent": useragent,
         }
         try:
             # Fetch wmn-data from WhatsMyName repository
-            response = requests.get("https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json")
+            response = requests.get(wmn_data_url)
             # Raise an exception if the response status code is not 200
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
@@ -276,12 +297,13 @@ def main():
                             try:
                                 result = future.result()
                                 if result:
-                                    site_name, uri_check = result
-                                    found_sites.append((site_name, uri_check))
+                                    site_name, uri_check, uri_pretty = result
+                                    found_sites.append((site_name, uri_check, uri_pretty))
                                     if not is_quiet:
                                         print("\033[32m" + "-" * 133)
                                         print(f"\033[32m[+] \033[1mTarget found\033[0m\033[32m ✓ on: \033[1m{site_name}\033[0m")
                                         print(f"\033[32m[+] Profile URL: {uri_check}\033[0m")
+                                        print(f"\033[32m[+] Pretty URL: {uri_pretty}\033[0m")
                                         print("\033[32m" + "-" * 133)
                             except:
                                 pass
@@ -309,15 +331,15 @@ def main():
                             "created_at_rfc3339": datetime.datetime.now(datetime.timezone.utc).isoformat()
                         }
                     }
-                    for site_name, uri_check in found_sites:
-                        found_site_dict["results"][site_name] = uri_check
+                    for site_name, uri_check, uri_pretty in found_sites:
+                        found_site_dict["results"][site_name] = uri_pretty
                     json.dump(found_site_dict, output, indent=4)
                     if not is_quiet:
                         print(f"\nJSON output generated: {output.name}")
                 else:            
                     print(f"\nThe user \033[1m{username}\033[0m was found on {len(found_sites)} sites:", file=output)
-                    for site_name, uri_check in found_sites:
-                        print(f"- \033[32m{site_name}\033[0m: {uri_check}", file=output)
+                    for site_name, uri_check, uri_pretty in found_sites:
+                        print(f"- \033[32m{site_name}\033[0m: {uri_pretty}", file=output)
 
                     # Generate HTML report
                     generate_html_report(username, found_sites)
